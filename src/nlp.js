@@ -26,6 +26,21 @@ function parse(text) {
 //       // console.log(JSON.stringify(output[0].parse_list, null, 2))
 //   })
 
+function train_ner(data,types) {
+    polyIO.client({ port: process.env.IOPORT });
+    var msg = {
+	input: [data, types],
+	to: 'nlp.cgkb-py',
+	intent: 'train_ner'
+    }
+    return global.client.pass(msg)
+	.then ((reply) => {
+	    return reply.output
+	});
+}
+
+
 module.exports = {
-  parse: parse
+    parse: parse,
+    train_ner: train_ner
 }

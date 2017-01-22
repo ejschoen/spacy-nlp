@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 # The client for py; imports all py modules
 
 ##########################################

@@ -1,0 +1,2 @@
+var spacyNLP = require('spacy-nlp');
+var serverPromise = spacyNLP.server({ port: process.env.IOPORT })

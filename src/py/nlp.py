@@ -1,5 +1,15 @@
 from collections import OrderedDict
+from tempfile import TemporaryFile
+import spacy
 from spacy.en import English  # NLP with spaCy https://spacy.io
+from spacy.pipeline import EntityRecognizer
+from spacy.gold import GoldParse
+import random
+import json
+import tempfile
+import os
+import zipfile
+
 nlp = English()  # will take some time to load
 
 # Useful properties, summary of the docs from https://spacy.io
@@ -127,3 +137,72 @@ def parse(input):
     return [parse_sentence(sent.text) for sent in doc.sents]
 
 # print(parse("Bob brought the pizza to Alice. I saw the man with glasses."))
+
+def train_ner(train_data,types):
+    '''
+    Given an array of 2-tuples, each of which is a training sentence and tagging 
+    data in BILOU format, train a named entity recognition model.
+    Return the model's dump file after training.
+    '''
+    nlp = spacy.load('en', parser=False, entity=False, add_vectors=False)
+    ner = EntityRecognizer(nlp.vocab, entity_types=types)
+
+    for itn in range(5):
+        random.shuffle(train_data)
+        for sample in train_data:
+            print(sample[0],sample[1])
+            doc = nlp.make_doc(sample[0])
+            gold = GoldParse(doc, entities=sample[1])
+            i = 0
+            loss = ner.update(doc,gold)
+    ner.model.end_training()
+
+    modeldump = tempfile.NamedTemporaryFile(delete=False)
+    vocabdump = tempfile.NamedTemporaryFile(delete=False)
+    lexemedump = tempfile.NamedTemporaryFile(delete=False)
+    configdump = tempfile.NamedTemporaryFile(delete=False)
+
+    with open(configdump.name, 'w') as file_:
+        json.dump(ner.cfg,file_)
+    ner.model.dump(modeldump.name)
+    ner.vocab.dump(lexemedump.name)
+    with open(vocabdump.name, 'w') as file_:
+        ner.vocab.strings.dump(file_)
+
+    model = modeldump.read()
+    modeldump.close()
+    os.remove(modeldump.name)
+
+    lexemes = lexemedump.read()
+    lexemedump.close()
+    os.remove(lexemedump.name)
+
+    config = configdump.read()
+    configdump.close()
+    os.remove(configdump.name)
+        
+    vocab = vocabdump.read()
+    vocabdump.close()
+    os.remove(vocabdump.name)
+    return [config, model, lexemes, vocab, nlp, ner]
+
+def test_train_ner(training_data,output_file):
+    with open(training_data,"r") as file_:
+        data = json.loads(file_.read())
+        result= train_ner(data, ['WELL','BASIN','FORMATION','LEASE_AREA','BLOCK','ORG','FIELD'])
+
+        nlp = result[4]
+        ner = result[5]
+        for itn in range(10):
+            sentence = data[itn][0]
+            doc = nlp.make_doc(sentence)
+            ner(doc)
+            for word in doc:
+                print(word.text, word.orth, word.lower, word.tag_, word.ent_type_, word.ent_iob)
+
+        with zipfile.ZipFile(output_file,'w') as zip_file:
+            zip_file.writestr('config.json',result[0])
+            zip_file.writestr('model',result[1])
+            zip_file.writestr('vocab/lexemes.bin',result[2])
+            zip_file.writestr('vocab/strings.json',result[3])
+
