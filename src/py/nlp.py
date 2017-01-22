@@ -150,7 +150,6 @@ def train_ner(train_data,types):
     for itn in range(5):
         random.shuffle(train_data)
         for sample in train_data:
-            print(sample[0],sample[1])
             doc = nlp.make_doc(sample[0])
             gold = GoldParse(doc, entities=sample[1])
             i = 0
@@ -197,6 +196,7 @@ def test_train_ner(training_data,output_file):
             sentence = data[itn][0]
             doc = nlp.make_doc(sentence)
             ner(doc)
+            print(sentence)
             for word in doc:
                 print(word.text, word.orth, word.lower, word.tag_, word.ent_type_, word.ent_iob)
 
