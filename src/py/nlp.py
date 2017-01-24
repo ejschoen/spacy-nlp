@@ -4,6 +4,7 @@ import spacy
 from spacy.en import English  # NLP with spaCy https://spacy.io
 from spacy.pipeline import EntityRecognizer
 from spacy.gold import GoldParse
+from spacy.tagger import Tagger
 import random
 import json
 import tempfile
@@ -141,11 +142,18 @@ def parse(input):
 def train_ner(train_data,types):
     '''
     Given an array of 2-tuples, each of which is a training sentence and tagging 
-    data in BILOU format, train a named entity recognition model.
-    Return the model's dump file after training.
+    data in standoff or BILOU format, train a named entity recognition model.
+    Return an array containing the binary or text of the configuration and model files 
+    that need to be loaded to recreate the trained recognizer.
     '''
     nlp = spacy.load('en', parser=False, entity=False, add_vectors=False)
+    nlp.tagger = Tagger(nlp.vocab, features=Tagger.feature_templates)
     ner = EntityRecognizer(nlp.vocab, entity_types=types)
+
+    for raw_text, _ in train_data:
+        doc = nlp.make_doc(raw_text)
+        for word in doc:
+            _ = nlp.vocab[word.orth]
 
     for itn in range(5):
         random.shuffle(train_data)
@@ -154,6 +162,11 @@ def train_ner(train_data,types):
             gold = GoldParse(doc, entities=sample[1])
             i = 0
             loss = ner.update(doc,gold)
+            nlp.tagger(doc)
+            while loss != 0 and i < 1000:
+                nlp.tagger(doc)
+                loss = ner.update(doc,gold)
+                i = i+1
     ner.model.end_training()
 
     modeldump = tempfile.NamedTemporaryFile(delete=False)
