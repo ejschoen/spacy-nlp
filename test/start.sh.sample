@@ -1,0 +1,3 @@
+#!/bin/bash
+cd /home/i2kdevops/spacy-nlp/test
+node test-spacy.js

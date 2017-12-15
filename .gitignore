@@ -18,3 +18,12 @@ __pycache__/
 
 # System files
 .DS_Store
+.spacy-venv
+.spacy-env
+**/#*
+**/.#*
+**/#*#
+test/nohup.out
+test/restart.sh
+test/start.sh
+get-pip.py

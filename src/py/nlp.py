@@ -1,16 +1,89 @@
 from collections import OrderedDict
 from tempfile import TemporaryFile
 import spacy
-from spacy.en import English  # NLP with spaCy https://spacy.io
+
+# spaCy 1.x
+# from spacy.en import English  # NLP with spaCy https://spacy.io
+# spaCy 2.x
+import en_core_web_sm
+
 from spacy.pipeline import EntityRecognizer
 from spacy.gold import GoldParse
+from spacy.attrs import ORTH,LIKE_NUM,TAG
 import random
 import json
 import tempfile
 import os
 import zipfile
 
-nlp = English()  # will take some time to load
+# spaCy 1.x
+# nlp = English()
+# spaCy 2.x
+nlp = en_core_web_sm.load()  # will take some time to load
+
+SPE_unit_abbreviations = (
+    "BFLD",
+    "BLPD",
+    "BOPD",
+    "BWPD",
+    "B/D",
+    "bbl/min",
+    "Bcd",
+    "Bcf/D",
+    "ft3/bbl",
+    "ft3/lbm",
+    "ft3/sec",
+    "cu yd",
+    "darcy",
+    "DWT",
+    "ft/min",
+    "ft/sec",
+    "lbf-ft",
+    "ft",
+    "ft-lbf",
+    "gal/min",
+    "gal/D",
+    "g",
+    "MMcf/D"
+    )
+
+match_stack = []
+
+def unit_match_cb(matcher,doc,i,matches):
+    ent_id,label,start,end = matches[i]
+    span = doc[start:end]
+    match_stack.append([start,end,'NNP','QUANTITY'])
+    #newspan = span.merge('NNP',span.text,'QUANTITY')
+
+def add_uom_match(matcher, unit):
+    matcher.add(unit,
+                "QUANTITY",
+                {},
+                [[{"like_num":True},{ORTH: unit}],
+                 [{"like_num":True},{ORTH: unit+"."}],
+                 [{"like_num":True},{ORTH: unit+","}],
+                 [{"like_num":True},{ORTH: unit+";"}]],
+                on_match=unit_match_cb)
+
+def add_uom_matches(matcher):
+    for unit in SPE_unit_abbreviations:
+        add_uom_match(matcher,unit)
+
+
+#add_uom_matches(nlp.matcher)
+
+def well_match_cb(matcher,doc,i,matches):
+    ent_id,label,start,end = matches[i]
+    span = doc[start:end]
+    match_stack.append([start,end,'NNP','FACILITY'])
+    #newspan = span.merge('NNP',span.text,'FACILITY')
+
+    
+#nlp.matcher.add("well-as-noun",
+#                "FACILITY",
+#                {},
+#                [[{TAG: "NNP"},{ORTH: "well"}]],
+#                on_match=well_match_cb)
 
 # Useful properties, summary of the docs from https://spacy.io
 
@@ -69,6 +142,7 @@ def format_POS(token, light=False, flat=False):
         ("POS_fine", token.tag_),
         ("POS_coarse", token.pos_),
         ("arc", token.dep_),
+        ("index", token.i),
         ("modifiers", [])
     ])
     if light:
@@ -111,11 +185,23 @@ def parse_list(doc, light=False):
 # Primary methods
 ##########################################
 
-def parse_sentence(sentence):
+def nlp_(nlp,sentence):
+    doc = nlp.make_doc(sentence)
+    nlp.tagger(doc)
+    nlp.parser(doc)
+    nlp.entity(doc)
+    #nlp.matcher(doc)
+    while (len(match_stack) > 0):
+        start,end,tag,entity = match_stack.pop()
+        span = doc[start:end]
+        span.merge(tag,span.text,entity)
+    return doc;
+
+def parse_sentence(sentence,segmented):
     '''
     Main method: parse an input sentence and return the nlp properties.
     '''
-    doc = nlp(sentence)
+    doc = nlp_(nlp,sentence)
     reply = OrderedDict([
         ("text", doc.text),
         ("len", len(doc)),
@@ -124,17 +210,31 @@ def parse_sentence(sentence):
         ("parse_tree", parse_tree(doc)),
         ("parse_list", parse_list(doc))
     ])
+    if not segmented:
+        reply["sentences"]= [sent.text for sent in doc.sents]
+        
     return reply
 
 # res = parse_sentence("find me flights from New York to London next month.")
 
 
-def parse(input):
+def split(input):
+    '''
+    Split input into separate sentences.
+    '''
+    doc = nlp(input, tag=False, entity=False)
+    return [sent.text for sent in doc.sents]
+
+
+def parse(input, segment=False):
     '''
     parse for multi-sentences; split and apply parse in a list.
     '''
-    doc = nlp(input, tag=False, entity=False)
-    return [parse_sentence(sent.text) for sent in doc.sents]
+    if segment:
+        doc = nlp(input, tag=False, entity=False)
+        return [parse_sentence(sent.text,True) for sent in doc.sents]
+    else:
+        return [parse_sentence(input,False)]
 
 # print(parse("Bob brought the pizza to Alice. I saw the man with glasses."))
 

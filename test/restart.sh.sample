@@ -1,0 +1,19 @@
+#!/bin/bash
+
+PROC=spacy-nlp
+
+## Give other processes time to start
+#/bin/sleep 30
+
+## kill screen session of process (nb. xargs = trim)
+screen_pid (){
+  screen -ls | grep $PROC | cut -d. -f1 | xargs
+}
+PID=$(screen_pid)
+echo "kill screen  [$PID]"
+kill $PID
+
+## Restart process in screen
+echo restart $PROC in screen
+screen -S $PROC -d -m ./start.sh &
+

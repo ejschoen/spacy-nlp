@@ -32,13 +32,15 @@ else
   fi
 fi
 
+python3 -m venv .spacy-env
+source .spacy-env/bin/activate
+
 # install pip modules
-if python3 -m pip show spacy socketIO-client >/dev/null; then
+if python3 -m pip show spacy download en socketIO-client >/dev/null; then
   echo "Pip modules already installed"
 else
-  python3 -m pip install -U socketIO-client
-  python3 -m pip install -U spacy
-  python3 -m spacy.en.download
+  pip3 install -U spacy
+  python3 -m spacy download en
 fi
 
 # install npm modules

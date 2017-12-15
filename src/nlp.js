@@ -6,12 +6,28 @@ process.env.IOPORT = process.env.IOPORT || 6466
 // call the python spacy nlp parser via socketIO
 // output: [{text, len, tokens, noun_phrases, parse_tree, parse_list}]
 /* istanbul ignore next */
-function parse(text) {
+function parse(text,segment) {
   polyIO.client({ port: process.env.IOPORT })
   var msg = {
-    input: text,
-    to: 'nlp.cgkb-py',
-    intent: 'parse'
+      input: [text,segment],
+      to: 'nlp.cgkb-py',
+      intent: 'parse'
+  }
+  return global.client.pass(msg)
+    .then((reply) => {
+      return reply.output
+    })
+}
+
+// call the python spacy nlp parser via socketIO
+// output: [{text, len, tokens, noun_phrases, parse_tree, parse_list}]
+/* istanbul ignore next */
+function split(text) {
+  polyIO.client({ port: process.env.IOPORT })
+  var msg = {
+      input: text,
+      to: 'nlp.cgkb-py',
+      intent: 'split'
   }
   return global.client.pass(msg)
     .then((reply) => {
