@@ -27,3 +27,5 @@ test/nohup.out
 test/restart.sh
 test/start.sh
 get-pip.py
+.idea
+test/nohup.out
